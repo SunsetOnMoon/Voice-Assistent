@@ -5,6 +5,10 @@ import os
 import sys
 #import multiproccesing
 from datetime import datetime
+import requests
+import json
+import time
+
 
 def init_speaker():
 	engine = pyttsx3.init()
@@ -20,6 +24,44 @@ def init_speaker():
 	voices = engine.getProperty('voice')
 	engine.setProperty('voice', voices[0])
 	return engine
+
+def get_weather_now(): #Дописать влажность, облачность
+	url = "https://api.ambeedata.com/weather/latest/by-lat-lng"
+	querystring = {"lat":"53.9018","lng":"27.5565"}
+	headers = {
+    	'x-api-key': "48d499acb58211be2ed40a6be345aac36cf27dce79dcd4559a5afe9e1e80c5d2",
+    	'Content-type': "application/json"
+    }
+	response = requests.request("GET", url, headers=headers, params=querystring)
+
+	weather_dict = json.loads(response.text)
+
+	celsius = (weather_dict['data']['temperature'] - 32) * 5 / 9
+	return round(celsius)
+
+def get_weather_forecast(hour):
+	url = "https://api.ambeedata.com/weather/forecast/by-lat-lng"
+	querystring = {"lat":"53.9018","lng":"27.5565"}
+	headers = {
+	    'x-api-key': "48d499acb58211be2ed40a6be345aac36cf27dce79dcd4559a5afe9e1e80c5d2API_KEY",
+	    'Content-type': "application/json"
+	    }
+	response = requests.request("GET", url, headers=headers, params=querystring)
+	forecast_dict = json.loads(response.text)
+
+	timestamp = int(time.time())
+
+	timestamp //= 60 * 60 * 24
+	timestamp += 1
+	timestamp *= 60 * 60 * 24
+	timestamp += hour * 60 * 60
+	#print(int(timestamp))
+	for forecast in forecast_dict['data']['forecast']:
+		if forecast['time'] == timestamp:
+			celsius = (forecast['temperature'] - 32) * 5 / 9
+			return round(celsius)
+
+
 
 def command(engine):
 	r = sr.Recognizer()
@@ -64,9 +106,32 @@ def do_task(task):
 		current_datetime = datetime.now()
 		engine.say('Сейчас ' + str(current_datetime.hour) + ' ' + str(current_datetime.minute))
 		engine.runAndWait()
+	elif 'погода на улице' in task:
+		celsius = get_weather_now()
+		engine.say('Сейчас на улице ' + str(celsius) + ' градусов Цельсия.')
+		engine.runAndWait()
+		#Дописать 
+		#
+		#
+	elif 'погода завтра утром' in task:
+		celsius = get_weather_forecast(8)
+		engine.say('Завтра утром на улице будет ' + str(celsius) + ' градусов Цельсия.')
+		engine.runAndWait()
+	elif 'погода завтра днём' in task:
+		celsius = get_weather_forecast(12)
+		engine.say('Завтра днём на улице будет ' + str(celsius) + ' градусов Цельсия.')
+		engine.runAndWait()
+	elif 'погода завтра вечером' in task:
+		celsius = get_weather_forecast(18)
+		engine.say('Завтра вечером на улице будет ' + str(celsius) + ' градусов Цельсия.')
+		engine.runAndWait()
+	elif 'спасибо' in task:
+		engine.say('Всегда рада помочь, зайка')
+		engine.runAndWait()
+
 
 engine = init_speaker()
-engine.say('Привет мой дорогой друг!')
+engine.say('Привет пупсик!')
 engine.runAndWait()
 
 while 1:
