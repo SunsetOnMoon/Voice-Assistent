@@ -8,9 +8,16 @@ from datetime import datetime
 import requests
 import json
 import time
+import threading
+import playsound
 
+#-----------------------------
+#Константы
+GMT = 3 # часовой пояс
+path_to_alarm = 'C:/Work/Studying/Python/Voice Assistent/alarm_erjan.mp3'
+#--------------------------
 
-def init_speaker():
+def init_speaker(): # инициализируем "голос"
 	engine = pyttsx3.init()
 
 	rate = engine.getProperty('rate')
@@ -39,7 +46,7 @@ def get_weather_now(): #Дописать влажность, облачност�
 	celsius = (weather_dict['data']['temperature'] - 32) * 5 / 9
 	return round(celsius)
 
-def get_weather_forecast(hour):
+def get_weather_forecast(hour): # Получаем прогноз погоды на завтра. Добавить влажность, облачность, скорость ветра
 	url = "https://api.ambeedata.com/weather/forecast/by-lat-lng"
 	querystring = {"lat":"53.9018","lng":"27.5565"}
 	headers = {
@@ -49,21 +56,28 @@ def get_weather_forecast(hour):
 	response = requests.request("GET", url, headers=headers, params=querystring)
 	forecast_dict = json.loads(response.text)
 
-	timestamp = int(time.time())
-
-	timestamp //= 60 * 60 * 24
-	timestamp += 1
-	timestamp *= 60 * 60 * 24
-	timestamp += hour * 60 * 60
+	timestamp = get_timestamp(hour, 0)
 	#print(int(timestamp))
 	for forecast in forecast_dict['data']['forecast']:
 		if forecast['time'] == timestamp:
 			celsius = (forecast['temperature'] - 32) * 5 / 9
 			return round(celsius)
 
+def alarm(hour, minutes): #будильник
+	time.sleep(get_timestamp(hour, minutes) - int(time.time()))
+	alarm_sound = threading.Thread(target = playsound.playsound, args = [path_to_alarm])
+	alarm_sound.start()
 
+def get_timestamp(hour, minutes): #получаем Unix Timestamp по начему часовому диапазону
+	timestamp = int(time.time())
 
-def command(engine):
+	timestamp //= 60 * 60 * 24
+	timestamp += 1
+	timestamp *= 60 * 60 * 24
+	timestamp += (hour - GMT) * 60 * 60 + minutes * 60
+	return timestamp
+
+def command(engine): # Распознаём речь
 	r = sr.Recognizer()
 
 	with sr.Microphone() as source:
@@ -76,14 +90,14 @@ def command(engine):
 		task = r.recognize_google(audio, language = 'ru-RU').lower()
 		print('Вы сказали: ' + task)
 	except sr.UnknownValueError:
-		engine.say('Я вас не поняла')
+		#engine.say('Я вас не поняла')
 		task = command(engine)
 			
 	return task
 			
 
 
-def do_task(task):
+def do_task(task): # Список выполняемых задач
 	if 'открыть сайт' in task:
 		engine.say('Уже открываю')
 		engine.runAndWait()
@@ -98,7 +112,7 @@ def do_task(task):
 		engine.say('Без проблем. До свидания!')
 		engine.runAndWait()
 		sys.exit()
-	elif 'включи музыку' in task:
+	elif 'включи музыку' in task: # попробовать мультипроццесность
 		engine.say('Слушайте...')
 		engine.runAndWait()
 		os.startfile(r'C:/Music/Big Baby Tape, kizaru - BANDANA I/bandana.aimppl')
@@ -127,6 +141,19 @@ def do_task(task):
 		engine.runAndWait()
 	elif 'спасибо' in task:
 		engine.say('Всегда рада помочь, зайка')
+		engine.runAndWait()
+	elif 'поставь будильник' in task:
+		parsed_str = task.split()
+		for string in parsed_str:
+			if ':' in string:
+				time_for_voice = string
+				parsed_time = string.split(':')
+				break
+		hour = int(parsed_time[0])
+		minutes = int(parsed_time[1])
+		alarm_thread = threading.Thread(target=alarm, args=[hour, minutes])
+		alarm_thread.start()
+		engine.say('Я поставила будильник на ' + time_for_voice)
 		engine.runAndWait()
 
 
